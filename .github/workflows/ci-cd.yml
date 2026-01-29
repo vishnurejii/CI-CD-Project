@@ -1,0 +1,79 @@
+name: Travel Website CI-CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest
+
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build package
+        run: |
+          mkdir build
+          cp travel_cost.py index.html requirements.txt build/
+          tar -czf travel-app.tar.gz build/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: travel-app
+          path: travel-app.tar.gz
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs: package
+    environment: dev
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: travel-app
+
+      - name: Deploy to DEV
+        run: |
+          echo "Deploying Travel Website to DEV"
+          mkdir dev-release
+          tar -xzf travel-app.tar.gz -C dev-release
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+    environment: prod
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: travel-app
+
+      - name: Deploy to PROD
+        run: |
+          echo "Deploying Travel Website to PRODUCTION"
+          mkdir prod-release
+          tar -xzf travel-app.tar.gz -C prod-release
